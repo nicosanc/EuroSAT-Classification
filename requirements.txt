@@ -1,0 +1,6 @@
+numpy
+torch
+torchivision
+scikit-learn
+seaborn
+matplotlib
