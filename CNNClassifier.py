@@ -10,33 +10,29 @@ from sklearn.metrics import confusion_matrix
 import seaborn as sns
 import matplotlib.pyplot as plt
 
-target_size = ([32,32])
-num_classes = 10
-learning_rate = 0.01
-num_epochs = 10
-classes = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
 
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
-train_transform = transforms.Compose([
-    transforms.ToTensor(),
-    transforms.Resize(target_size),
-    transforms.RandomHorizontalFlip(p=0.5),
-    transforms.Normalize(mean=(0.491, 0.482, 0.446), std=(0.247, 0.243, 0.261))
-])
-
-transform = transforms.Compose([
-    transforms.ToTensor(),
-    transforms.Normalize(mean=(0.491, 0.482, 0.446), std=(0.247 ,0.243, 0.261)),
-])
-
-train_data = CIFAR10(root='./data', train=True, download=True, transform=train_transform)
-test_data = CIFAR10(root='./data', train=False, download=True, transform=transform)
-valid_data, test_data = random_split(test_data, [6500,3500])
-
-train_load = DataLoader(train_data, batch_size=64, shuffle=True)
-valid_load = DataLoader(valid_data, batch_size=64, shuffle=False)
-test_load = DataLoader(test_data, batch_size=64, shuffle=False)
+def data_load():
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    train_transform = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Resize(target_size),
+        transforms.RandomHorizontalFlip(p=0.5),
+        transforms.Normalize(mean=(0.491, 0.482, 0.446), std=(0.247, 0.243, 0.261))
+    ])
+    
+    transform = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize(mean=(0.491, 0.482, 0.446), std=(0.247 ,0.243, 0.261)),
+    ])
+    
+    train_data = CIFAR10(root='./data', train=True, download=True, transform=train_transform)
+    test_data = CIFAR10(root='./data', train=False, download=True, transform=transform)
+    valid_data, test_data = random_split(test_data, [6500,3500])
+    
+    train_load = DataLoader(train_data, batch_size=64, shuffle=True)
+    valid_load = DataLoader(valid_data, batch_size=64, shuffle=False)
+    test_load = DataLoader(test_data, batch_size=64, shuffle=False)
+    return train_load, valid_load, test_load
 
 class ConvNeuralNet(nn.Module):
   def __init__(self, num_classes) -> None:
@@ -74,93 +70,105 @@ class ConvNeuralNet(nn.Module):
     x = self.fc2(x)
     return x
 
-model = ConvNeuralNet(num_classes).to(device)
-criterion = nn.CrossEntropyLoss()
-optimizer = optim.Adam(model.parameters(), lr=learning_rate)
-
-print("training model...")
-for epoch in range(num_epochs):
-  running_loss=0.0
-  for data in train_load:
-    # Here we initialize the model and pass in the batches one by one
-    # this is repeated for however many epochs we specify
-    inputs, labels = data
-    # zero out the gradients before passing in a new batch
-    optimizer.zero_grad()
-
-    outputs = model(inputs.cuda())
-
-    # Our loss function is a cross entropy loss function, we pass in the outputs from our model
-    # and the labels to the corresponding data -> test how close it is
-    loss = criterion(outputs.to(device), labels.to(device))
-    # back propagate to calculate gradients -> by default all input tensors are
-    # set to requires_gradient = true
-    loss.backward()
-    # takes one optimization step at the end of the batch iteration
-    optimizer.step()
-
-    running_loss += loss.item()
-  print(f"epoch {epoch + 1}, loss {running_loss/len(train_load)}")
-
-print("finished training")
-saved_model = model.state_dict()
-torch.save(saved_model, './saved_model.pth') # saving the model
-
-model.eval()
-
-total_correct = 0
-total_loss = 0.0
-total_images = 0
-
-# to measure how many were right given the real labels
-y_true = []
-y_pred = []
-
-# to plot accuracy per class
-correct_per_class = np.zeros(num_classes)
-total_per_class = np.zeros(num_classes)
-
-with torch.no_grad():
-  for i, (input,labels) in enumerate(test_load):
+def train_model(num_classes):
+    model = ConvNeuralNet(num_classes).to(device)
+    criterion = nn.CrossEntropyLoss()
+    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
     
-    input, labels = input.to(device), labels.to(device)
-    outputs = model(input)
+    train_load, valid_load, test_load = load_data()
+    print("training model...")
+    for epoch in range(num_epochs):
+      running_loss=0.0
+      for data in train_load:
+        # Here we initialize the model and pass in the batches one by one
+        # this is repeated for however many epochs we specify
+        inputs, labels = data
+        # zero out the gradients before passing in a new batch
+        optimizer.zero_grad()
+    
+        outputs = model(inputs.cuda())
+    
+        # Our loss function is a cross entropy loss function, we pass in the outputs from our model
+        # and the labels to the corresponding data -> test how close it is
+        loss = criterion(outputs.to(device), labels.to(device))
+        # back propagate to calculate gradients -> by default all input tensors are
+        # set to requires_gradient = true
+        loss.backward()
+        # takes one optimization step at the end of the batch iteration
+        optimizer.step()
+    
+        running_loss += loss.item()
+      print(f"epoch {epoch + 1}, loss {running_loss/len(train_load)}")
+    print("finished training")
+    saved_model = model.state_dict()
+    torch.save(saved_model, './saved_model.pth') # saving the model
+    test_model(model, test_load)
 
-    #loss
-    loss = criterion(outputs, labels)
-    total_loss += loss.item()*len(labels)
+def test_model(model, test_load):
+    model.eval()
+    total_correct = 0
+    total_loss = 0.0
+    total_images = 0
+    
+    # to measure how many were right given the real labels
+    y_true = []
+    y_pred = []
+    
+    # to plot accuracy per class
+    correct_per_class = np.zeros(num_classes)
+    total_per_class = np.zeros(num_classes)
+    
+    with torch.no_grad():
+      for i, (input,labels) in enumerate(test_load):
+        
+        input, labels = input.to(device), labels.to(device)
+        outputs = model(input)
+    
+        #loss
+        loss = criterion(outputs, labels)
+        total_loss += loss.item()*len(labels)
+    
+        # accuracy
+        _, predicted = torch.max(outputs.data, 1)
+        total_correct += (predicted == labels).sum().item()
+        total_images += labels.size(0)
+    
+        labels_numpy = labels.cpu().numpy()
+        predicted_numpy = predicted.cpu().numpy()
+    
+        y_true.extend(labels.cpu().tolist())
+        y_pred.extend(predicted.cpu().tolist())
+    
+        for i in range(num_classes):
+          correct_per_class[i] += (predicted_numpy[i] == labels_numpy[i])
+          total_per_class[i] += 1
+            
+    # plotting the model's performance on the test set
+    test_accuracy = total_correct/total_images
+    print(f"test accuracy {test_accuracy}")
+    average_test_loss = total_loss/total_images
+    print(f"average test loss {average_test_loss}")
+    conf_mat = confusion_matrix(y_true, y_pred)
+    plt.figure(figsize=(10,7))
+    sns.heatmap(conf_mat, annot=True, cmap='Blues', fmt='g')
+    plt.xlabel('Predicted')
+    plt.ylabel('Truth')
+    plt.show()
+    
+    class_accuracy = 100 * correct_per_class/total_per_class
+    plt.figure(figsize=(12,6))
+    plt.bar(range(num_classes), class_accuracy, color = 'lightblue')
+    plt.xticks(range(num_classes), classes)
+    plt.ylabel('Accuracy')
+    plt.xlabel('Class')
+    plt.show()
 
-    # accuracy
-    _, predicted = torch.max(outputs.data, 1)
-    total_correct += (predicted == labels).sum().item()
-    total_images += labels.size(0)
-
-    labels_numpy = labels.cpu().numpy()
-    predicted_numpy = predicted.cpu().numpy()
-
-    y_true.extend(labels.cpu().tolist())
-    y_pred.extend(predicted.cpu().tolist())
-
-    for i in range(num_classes):
-      correct_per_class[i] += (predicted_numpy[i] == labels_numpy[i])
-      total_per_class[i] += 1
-
-
-val_accuracy = total_correct/total_images
-print(f"validation accuracy {val_accuracy}")
-average_val_loss = total_loss/total_images
-print(f"average validation loss {average_val_loss}")
-conf_mat = confusion_matrix(y_true, y_pred)
-plt.figure(figsize=(10,7))
-sns.heatmap(conf_mat, annot=True, cmap='Blues', fmt='g')
-plt.xlabel('Predicted')
-plt.ylabel('Truth')
-plt.show()
-
-class_accuracy = 100 * correct_per_class/total_per_class
-plt.figure(figsize=(12,6))
-plt.bar(range(num_classes), class_accuracy, color = 'lightblue')
-plt.xticks(range(num_classes), classes)
-plt.ylabel('Accuracy')
-plt.xlabel('Class')
-plt.show()
+if __name__ == "__main__":
+    target_size = ([32,32])
+    num_classes = 10
+    learning_rate = 0.01
+    num_epochs = 10
+    classes = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
+    
+    
+    
