@@ -1,5 +1,5 @@
 # Image Classification using a PyTorch CNN on the EuroSAT Dataset :
-A detailed report of the project and dataset can be found here: [Exploring Land Use and Land Cover Classification](https://docs.google.com/document/d/1igTPbtshiK5AX-1xFavrqxmlSK0C1rMxwJOQ6TucVMA/edit?usp=sharing)
+A detailed report of the project and dataset can be found here: [Exploring Land Use and Land Cover Classification](https://docs.google.com/document/d/1igTPbtshiK5AX-1xFavrqxmlSK0C1rMxwJOQ6TucVMA/edit?usp=sharing). 
 The Google Colab Notebook can be directly interacted with using this link: [EuroSAT_CNN](https://colab.research.google.com/drive/1Tgy1JURZ98NB78BDGqpVsikoPQ-t-4RY?usp=sharing)
 
 ## Purpose 
